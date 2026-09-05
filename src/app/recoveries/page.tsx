@@ -48,16 +48,19 @@ export default async function Recoveries({
   const to = Math.min(page * PAGE_SIZE, total);
 
   return (
-    <div className="p-8 animate-fade-in">
+    <div className="p-8 animate-fade-in relative">
+      {/* Background radial for light theme depth */}
+      <div className="absolute -left-20 top-20 h-64 w-64 bg-brand-500/5 blur-[100px] rounded-full pointer-events-none -z-10" aria-hidden="true" />
+      
       {/* Page header */}
-      <div className="mb-8">
+      <div className="mb-8 relative z-10">
         <p className="page-eyebrow">Recovery operations</p>
         <h2 className="page-title">Failed payment queue</h2>
       </div>
 
-      <div className="card card-static overflow-hidden">
+      <div className="card card-static overflow-hidden relative z-10 shadow-sm">
         {/* Search / filter bar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/50 px-5 py-3">
           <form className="relative flex-1 min-w-[220px] max-w-sm" method="get">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
               <Search size={14} />
@@ -66,17 +69,17 @@ export default async function Recoveries({
               name="q"
               defaultValue={q}
               aria-label="Filter recovery cases"
-              className="input pl-8 py-1.5 text-xs"
+              className="input pl-8 py-1.5 text-xs bg-white border-slate-200"
               placeholder="Status, reason, action, customer…"
             />
           </form>
-          <Badge variant="muted" className="tabular-nums">{total} cases</Badge>
+          <Badge variant="muted" className="tabular-nums bg-white shadow-sm">{total} cases</Badge>
           {q && (
-            <Link href="/recoveries" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
+            <Link href="/recoveries" className="text-xs font-medium text-brand-600 hover:text-brand-500 transition-colors">
               Clear filter
             </Link>
           )}
-          <span className="ml-auto text-xs text-slate-400 tabular-nums">
+          <span className="ml-auto text-xs text-slate-500 tabular-nums">
             Page {page} of {pages}
           </span>
         </div>
@@ -102,18 +105,18 @@ export default async function Recoveries({
                     <td>
                       <Link
                         href={`/recoveries/${c.id}`}
-                        className="font-semibold text-slate-900 hover:text-emerald-700 transition-colors"
+                        className="font-semibold text-slate-900 hover:text-brand-600 transition-colors"
                       >
                         {c.paymentAttempt.customer.name}
                       </Link>
-                      <p className="text-xs text-slate-400 mt-0.5">{c.paymentAttempt.customer.email}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{c.paymentAttempt.customer.email}</p>
                     </td>
-                    <td className="font-semibold tabular-nums">{inr(c.paymentAttempt.amount)}</td>
+                    <td className="font-semibold tabular-nums text-slate-900">{inr(c.paymentAttempt.amount)}</td>
                     <td className="text-slate-600">{label(c.paymentAttempt.failureReason)}</td>
                     <td>
                       <div className="flex items-center gap-2 min-w-[110px]">
                         <ProgressBar value={c.predictedRecoveryProbability} size="sm" className="flex-1" />
-                        <span className="text-xs tabular-nums text-slate-500 w-6 text-right">
+                        <span className="text-xs font-medium tabular-nums text-slate-500 w-6 text-right">
                           {c.predictedRecoveryProbability}
                         </span>
                       </div>
@@ -128,7 +131,7 @@ export default async function Recoveries({
                       {c.requiresHumanApproval ? (
                         <Badge variant="warning">High</Badge>
                       ) : (
-                        <Badge variant="muted">Standard</Badge>
+                        <Badge variant="muted" className="bg-slate-100 text-slate-500">Standard</Badge>
                       )}
                     </td>
                   </tr>
@@ -137,15 +140,15 @@ export default async function Recoveries({
             </table>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-400">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-slate-50/50">
+            <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-400 border border-slate-200">
               <RefreshCw size={24} />
             </span>
-            <p className="mt-4 text-sm font-medium text-slate-700">
+            <p className="mt-4 text-sm font-medium text-slate-600">
               {q ? `No cases match "${q}"` : 'No recovery cases yet.'}
             </p>
             {q && (
-              <Link href="/recoveries" className="mt-2 text-xs text-emerald-700 hover:underline">
+              <Link href="/recoveries" className="mt-2 text-xs font-medium text-brand-600 hover:underline">
                 Clear search and view all cases
               </Link>
             )}
@@ -153,7 +156,7 @@ export default async function Recoveries({
         )}
 
         {/* Pagination */}
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/40 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-5 py-3">
           <span className="text-xs text-slate-500 tabular-nums">
             Showing {from}–{to} of {total}
           </span>
@@ -161,25 +164,25 @@ export default async function Recoveries({
             {page > 1 ? (
               <Link
                 href={`/recoveries?page=${page - 1}&q=${encodeURIComponent(q)}`}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
               >
                 <ChevronLeft size={12} /> Previous
               </Link>
             ) : (
-              <span className="flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-300 cursor-not-allowed">
+              <span className="flex items-center gap-1 rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed">
                 <ChevronLeft size={12} /> Previous
               </span>
             )}
-            <span className="px-3 py-1.5 text-xs tabular-nums text-slate-500">{page} / {pages}</span>
+            <span className="px-3 py-1.5 text-xs font-medium tabular-nums text-slate-500">{page} / {pages}</span>
             {page < pages ? (
               <Link
                 href={`/recoveries?page=${page + 1}&q=${encodeURIComponent(q)}`}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
               >
                 Next <ChevronRight size={12} />
               </Link>
             ) : (
-              <span className="flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-300 cursor-not-allowed">
+              <span className="flex items-center gap-1 rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed">
                 Next <ChevronRight size={12} />
               </span>
             )}

@@ -25,7 +25,7 @@ export function SectionCard({
       {...(title ? {'aria-labelledby': `sc-${title.replace(/\s+/g, '-').toLowerCase()}`} : {})}
     >
       {(title || action) && (
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-4">
           <div>
             {title && (
               <h3

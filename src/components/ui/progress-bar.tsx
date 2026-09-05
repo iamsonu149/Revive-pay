@@ -9,13 +9,13 @@ interface ProgressBarProps {
   className?: string;
 }
 
-const trackClass = 'bg-slate-100 rounded-full overflow-hidden';
+const trackClass = 'bg-slate-100 rounded-full overflow-hidden shadow-inner';
 
 const fillClass: Record<NonNullable<ProgressBarProps['variant']>, string> = {
-  success: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  danger:  'bg-red-500',
-  default: 'bg-slate-500',
+  success: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
+  warning: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]',
+  danger:  'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]',
+  default: 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.2)]',
 };
 
 function autoVariant(value: number): NonNullable<ProgressBarProps['variant']> {
@@ -48,7 +48,7 @@ export function ProgressBar({
         />
       </div>
       {showLabel && (
-        <span className="text-xs font-semibold tabular-nums text-slate-500 w-8 text-right">
+        <span className="text-xs font-medium tabular-nums text-slate-500 w-8 text-right">
           {pct}
         </span>
       )}
