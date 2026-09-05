@@ -1,0 +1,1 @@
+export const AUTO_LIMIT=10000, MAX_CONTACTS=2;

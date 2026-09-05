@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id            String           @id @default(cuid())
+  name          String
+  email         String           @unique
+  phone         String
+  riskBand      String
+  createdAt     DateTime         @default(now())
+  subscriptions Subscription[]
+  attempts      PaymentAttempt[]
+  contacts      ContactEvent[]
+}
+
+model Subscription {
+  id              String           @id @default(cuid())
+  customerId      String
+  planName        String
+  amount          Int
+  status          String
+  nextBillingDate DateTime
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  attempts        PaymentAttempt[]
+}
+
+model PaymentAttempt {
+  id                       String        @id @default(cuid())
+  subscriptionId           String
+  customerId               String
+  amount                   Int
+  status                   String
+  failureReason            String
+  attemptedAt              DateTime
+  retryCount               Int
+  paymentMethodAgeDays     Int
+  recentSuccessfulPayments Int
+  bankHealthScore          Int
+  customerEngagementScore  Int
+  contactCountLast7Days    Int
+  subscription             Subscription  @relation(fields: [subscriptionId], references: [id])
+  customer                 Customer      @relation(fields: [customerId], references: [id])
+  recoveryCase             RecoveryCase?
+}
+
+model RecoveryCase {
+  id                           String             @id @default(cuid())
+  paymentAttemptId             String             @unique
+  predictedRecoveryProbability Int
+  recommendedAction            String
+  reasonSummary                String
+  evidence                     String
+  status                       String             @default("PENDING_APPROVAL")
+  requiresHumanApproval        Boolean
+  approvedAmount               Int?
+  scheduledFor                 DateTime?
+  recoveredAmount              Int                @default(0)
+  recoveredAt                  DateTime?
+  createdAt                    DateTime           @default(now())
+  updatedAt                    DateTime           @updatedAt
+  paymentAttempt               PaymentAttempt     @relation(fields: [paymentAttemptId], references: [id])
+  events                       AuditEvent[]
+  execution                    RecoveryExecution?
+  analyses                     RecoveryAnalysis[]
+}
+
+model AuditEvent {
+  id             String        @id @default(cuid())
+  recoveryCaseId String?
+  eventType      String
+  actor          String
+  payload        String
+  createdAt      DateTime      @default(now())
+  recoveryCase   RecoveryCase? @relation(fields: [recoveryCaseId], references: [id])
+}
+
+model ContactEvent {
+  id             String   @id @default(cuid())
+  customerId     String
+  reservationKey String   @unique
+  createdAt      DateTime @default(now())
+  customer       Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, createdAt])
+}
+
+model RecoveryExecution {
+  id                String       @id
+  recoveryCaseId    String       @unique
+  action            String
+  status            String       @default("CLAIMED")
+  providerReference String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  recoveryCase      RecoveryCase @relation(fields: [recoveryCaseId], references: [id])
+}
+
+model MockProviderOperation {
+  id        String   @id
+  paymentId String
+  action    String
+  outcome   String
+  reference String
+  createdAt DateTime @default(now())
+}
+
+model SimulationRun {
+  id                     String   @id @default(cuid())
+  strategyName           String
+  totalPayments          Int
+  failuresDetected       Int
+  recoveredCount         Int
+  recoveredAmount        Int
+  retryAttempts          Int
+  messagesSent           Int
+  avoidedBadRetries      Int
+  customerAnnoyanceScore Int
+  createdAt              DateTime @default(now())
+}
+
+model Setting {
+  id                String   @id @default("merchant")
+  autoRecoveryLimit Int      @default(10000)
+  maxContacts       Int      @default(2)
+  killSwitch        Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
+}
+
+model RecoveryAnalysis {
+  id                    String       @id @default(cuid())
+  recoveryCaseId        String
+  requestId             String       @unique
+  status                String       @default("RUNNING")
+  source                String?
+  model                 String?
+  requestedModel        String?
+  promptVersion         String
+  evidenceFingerprint   String
+  evidenceJson          String
+  analysisJson          String?
+  policyJson            String?
+  fallbackReason        String?
+  createdAt             DateTime     @default(now())
+  completedAt           DateTime?
+  recoveryCase          RecoveryCase @relation(fields: [recoveryCaseId], references: [id], onDelete: Cascade)
+
+  @@index([recoveryCaseId, createdAt])
+}
+
+model AnalysisBudget {
+  id           String   @id @default("merchant")
+  windowStart  DateTime
+  requestCount Int      @default(0)
+}

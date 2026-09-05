@@ -1,0 +1,46 @@
+{
+  "name": "revive-pay",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "tsx prisma/seed.ts",
+    "auth:setup": "node scripts/configure-auth.mjs",
+    "worker": "tsx scripts/recovery-worker.ts",
+    "worker:once": "tsx scripts/recovery-worker.ts --once",
+    "db:backfill": "tsx scripts/backfill-safety.ts",
+    "test:smoke": "node scripts/smoke.mjs"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "5.19.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "next": "14.2.16",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "@types/react": "18.3.10",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.16",
+    "postcss": "^8.4.47",
+    "prisma": "5.19.1",
+    "tailwindcss": "^3.4.13",
+    "tsx": "^4.19.1",
+    "typescript": "5.6.2",
+    "vitest": "2.1.2"
+  }
+}

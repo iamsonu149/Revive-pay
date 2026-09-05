@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.npm-cache/
+.env
+.env.*
+!.env.example
+prisma/*.db*
+prisma/backups/
+*.tsbuildinfo
+test-results/

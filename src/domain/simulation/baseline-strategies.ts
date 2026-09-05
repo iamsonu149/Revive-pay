@@ -1,0 +1,1 @@
+export type Metrics={strategyName:string;totalPayments:number;failuresDetected:number;recoveredCount:number;recoveredAmount:number;retryAttempts:number;messagesSent:number;avoidedBadRetries:number;customerAnnoyanceScore:number};

@@ -1,0 +1,1 @@
+import {db} from '@/lib/db'; export const audit=(recoveryCaseId:string,eventType:string,actor:'SYSTEM'|'MERCHANT',payload:object={})=>db.auditEvent.create({data:{recoveryCaseId,eventType,actor,payload:JSON.stringify(payload)}});

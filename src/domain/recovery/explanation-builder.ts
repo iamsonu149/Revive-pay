@@ -1,0 +1,1 @@
+import {Decision} from './types'; export const explanation=(d:Decision)=>`${d.reasonSummary} Evidence: ${d.evidence.join(', ')}.${d.requiresHumanApproval?' Human approval is required because this payment exceeds the configured automatic recovery limit.':''}`;

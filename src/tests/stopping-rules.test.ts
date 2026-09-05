@@ -1,0 +1,1 @@
+import {it,expect} from 'vitest'; import {stoppingRule} from '../domain/recovery/stopping-rules'; it('blocks excess retry',()=>expect(stoppingRule({failureReason:'BANK_TECHNICAL',retryCount:2,contactCountLast7Days:0} as any)).toContain('retry'));
