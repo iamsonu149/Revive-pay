@@ -60,6 +60,15 @@ export default async function Detail({params}: {params: {id: string}}) {
   );
   const evidence = JSON.parse(c.evidence) as string[];
   const score = c.predictedRecoveryProbability;
+  const eventTypes=new Set(c.events.map(event=>event.eventType));
+  const journey=[
+    {label:p.provider==='razorpay_test'?'Signed webhook received':'Failure recorded',done:p.provider!=='razorpay_test'||eventTypes.has('PAYMENT_FAILURE_INGESTED'),detail:p.provider==='razorpay_test'?'Razorpay event linked to this case':'Synthetic case persisted'},
+    {label:'Diagnosis and scoring',done:eventTypes.has('RECOMMENDATION_CREATED'),detail:'Only bounded payment signals are evaluated'},
+    {label:'Deterministic policy decision',done:true,detail:label(c.recommendedAction)},
+    {label:'Approval',done:!required||c.status==='APPROVED'||!!c.execution,detail:required?'Merchant approval required':'Not required by policy'},
+    {label:'Provider action',done:!!c.execution,detail:c.execution?`${label(c.execution.action)} · ${label(c.execution.status)}`:'Not executed'},
+    {label:'Verified payment result',done:['RECOVERED','FAILED'].includes(c.status),detail:c.status==='RECOVERED'?'Payment confirmed and revenue recorded':c.status==='FAILED'?'Provider confirmed failure':'Awaiting confirmation'},
+  ];
 
   const eventTypeIcon: Record<string, typeof ShieldAlert> = {};
   void eventTypeIcon;
@@ -152,7 +161,7 @@ export default async function Detail({params}: {params: {id: string}}) {
           <section className="card card-static" aria-labelledby="controls-heading">
             <div className="border-b border-slate-100 px-6 py-4">
               <h3 id="controls-heading" className="section-title">Action controls</h3>
-              <p className="mt-0.5 text-xs text-slate-500">One persistent action per case. Mock payments only.</p>
+              <p className="mt-0.5 text-xs text-slate-500">One persistent action per case · {p.provider==='razorpay_test'?'Razorpay Test Mode':'Mock provider'}.</p>
             </div>
             <div className="p-6">
               <ApprovalPanel
@@ -165,6 +174,8 @@ export default async function Detail({params}: {params: {id: string}}) {
                 required={required || (c.status === 'APPROVED' && c.approvedAmount !== p.amount)}
                 action={c.recommendedAction}
                 hasExecution={!!c.execution}
+                providerMode={p.provider==='razorpay_test'?'razorpay_test':'mock'}
+                recoveryUrl={c.execution?.recoveryUrl}
                 scheduledFor={
                   c.recommendedAction === 'RETRY_LATER'
                     ? new Date(
@@ -261,29 +272,22 @@ export default async function Detail({params}: {params: {id: string}}) {
             )}
           </section>
 
-          {/* Audit timeline */}
+          {/* Recovery journey */}
           <section className="card card-static" aria-labelledby="timeline-heading">
             <div className="border-b border-slate-100 px-6 py-4">
-              <h3 id="timeline-heading" className="section-title">Audit timeline</h3>
+              <h3 id="timeline-heading" className="section-title">Recovery journey</h3>
+              <p className="mt-0.5 text-xs text-slate-500">Failure to verified provider outcome</p>
             </div>
             <div className="px-6 py-4">
-              {c.events.length ? (
-                <ol className="relative border-l border-slate-200 ml-2">
-                  {c.events.map(e => (
-                    <li key={e.id} className="mb-5 ml-5">
-                      <span className="absolute -left-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-slate-200 ring-4 ring-white">
-                        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
-                      </span>
-                      <p className="text-xs font-semibold text-slate-900">{label(e.eventType)}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {e.actor} · {e.createdAt.toLocaleString('en-IN')}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="text-sm text-slate-400">No events recorded.</p>
-              )}
+              <ol className="relative border-l border-slate-200 ml-2">
+                {journey.map((stage,index)=><li key={stage.label} className="mb-5 ml-5 last:mb-0">
+                  <span className={`absolute -left-2 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${stage.done?'bg-emerald-500':index===journey.findIndex(item=>!item.done)?'bg-amber-400':'bg-slate-200'}`}>
+                    {stage.done&&<CheckCircle2 size={10} className="text-white"/>}
+                  </span>
+                  <p className={`text-xs font-semibold ${stage.done?'text-slate-900':'text-slate-500'}`}>{stage.label}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{stage.detail}</p>
+                </li>)}
+              </ol>
             </div>
           </section>
         </div>

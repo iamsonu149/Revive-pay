@@ -1,3 +1,2 @@
-import {simulationMetrics} from '@/domain/simulation/simulation-service';
-import {merchantRequest} from '@/lib/api';
-export function POST(request:Request){return merchantRequest(request,actor=>simulationMetrics(true,actor));}
+import {simulationMetrics} from '@/domain/simulation/simulation-service';import {merchantRequest} from '@/lib/api';import {defaultAssumptions} from '@/domain/simulation/simulator';import {RecoveryError} from '@/domain/recovery/policy';
+export function POST(request:Request){return merchantRequest(request,async actor=>{const raw=await request.text();if(raw.length>4096)throw new RecoveryError('Request too large',413);let body=defaultAssumptions;if(raw)try{body={...defaultAssumptions,...JSON.parse(raw)}}catch{throw new RecoveryError('Invalid JSON',400)};for(const value of Object.values(body))if(typeof value!=='number'||!Number.isFinite(value))throw new RecoveryError('Simulation assumptions must be finite numbers',400);return simulationMetrics(true,actor,body);});}

@@ -9,18 +9,25 @@ import {
   ScrollText,
   Settings,
   Zap,
+  ShieldCheck,
+  Radio,
+  TestTube2,
+  Presentation,
 } from 'lucide-react';
 import {clsx} from 'clsx';
 
 const links = [
   ['Dashboard',           '/dashboard',  LayoutDashboard],
   ['Recovery queue',      '/recoveries', RefreshCw],
+  ['Approval Center',     '/approvals',  ShieldCheck],
+  ['Webhook operations',  '/webhooks',   Radio],
   ['Strategy simulator',  '/simulator',  FlaskConical],
+  ['Judge Demo',           '/judge-demo', Presentation],
   ['Audit log',           '/audit',      ScrollText],
   ['Settings',            '/settings',   Settings],
 ] as const;
 
-export function AppSidebar() {
+export function AppSidebar({providerName,providerMode}:{providerName:string;providerMode:string}) {
   const pathname = usePathname();
 
   return (
@@ -62,6 +69,7 @@ export function AppSidebar() {
             </Link>
           );
         })}
+        {providerMode==='mock'&&<Link href="/safety-lab" className={clsx('nav',pathname.startsWith('/safety-lab')&&'active')}><TestTube2 size={16}/>Safety Lab</Link>}
       </nav>
 
       {/* Footer badge */}
@@ -71,7 +79,7 @@ export function AppSidebar() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
           </span>
-          <span className="text-xs text-slate-500">Mock Razorpay · Test mode</span>
+          <span className="text-xs text-slate-500">{providerName}</span>
         </div>
       </div>
     </aside>

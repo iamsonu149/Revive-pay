@@ -11,7 +11,7 @@ const directory=mkdtempSync(join(tmpdir(),'revive-smoke-'));
 const url=`file:${join(directory,'test.db').replaceAll('\\','/')}`;
 writeFileSync(join(directory,'test.db'),'');
 const client=new PrismaClient({datasources:{db:{url}}});
-const env={...process.env,DATABASE_URL:url,MERCHANT_USER:'smoke',MERCHANT_PASSWORD:'isolated-smoke-password-12345',GEMINI_API_KEY:'',GEMINI_MODEL:'gemini-3.8-flash'};
+const env={...process.env,DATABASE_URL:url,MERCHANT_USER:'smoke',MERCHANT_PASSWORD:'isolated-smoke-password-12345',GEMINI_API_KEY:'',GEMINI_MODEL:'gemini-3.8-flash',PAYMENT_PROVIDER:'mock'};
 const authorization=`Basic ${Buffer.from(`${env.MERCHANT_USER}:${env.MERCHANT_PASSWORD}`).toString('base64')}`;
 let server;
 let output='';
@@ -39,14 +39,18 @@ try {
  assert(ready,'Production server did not start');
  const request=(path,method='GET',body,extra={})=>fetch(base+path,{method,headers:{authorization,...(method==='GET'?{}:{origin:base,'Content-Type':'application/json'}),...extra},body:body===undefined?undefined:JSON.stringify(body)});
  assert.equal((await fetch(base+'/dashboard')).status,401);
- for(const path of ['/dashboard','/audit','/recoveries','/simulator',`/recoveries/${link.id}`]) {
+ for(const path of ['/dashboard','/audit','/recoveries','/approvals','/webhooks','/safety-lab','/simulator','/judge-demo',`/recoveries/${link.id}`]) {
    const denied=await fetch(base+path,{headers:{'x-middleware-subrequest':Array(5).fill('middleware:src/middleware').join(':')}});
    const body=await denied.text();assert(!body.includes('Smoke Customer'),`Unauthenticated page exposed case data: ${path}`);
  }
  assert.equal((await fetch(base+'/api/settings',{method:'PATCH',headers:{'x-middleware-subrequest':'middleware:middleware:middleware:middleware:middleware'},body:'{}'})).status,401);
- for(const path of ['/dashboard','/recoveries','/recoveries?q=no-matches','/audit','/settings','/simulator',`/recoveries/${link.id}`,'/api/payments']) {
+ for(const path of ['/dashboard','/recoveries','/recoveries?q=no-matches','/approvals','/webhooks','/safety-lab','/judge-demo','/audit','/settings','/simulator',`/recoveries/${link.id}`,'/api/payments']) {
    const r=await request(path);assert.equal(r.status,200,`${path}: ${await r.text()}`);
  }
+ for(const scenario of ['CONCURRENT_WEBHOOK','DUPLICATE_EXECUTION','PROVIDER_TIMEOUT','STALE_RESERVATION','INVALID_SIGNATURE','UNSAFE_RETRY','KILL_SWITCH','CONTACT_LIMIT']) {
+   const response=await request('/api/safety-lab','POST',{scenario});assert.equal(response.status,200,`Safety Lab ${scenario}: ${await response.text()}`);
+ }
+ assert.equal(await client.safetyLabRun.count({where:{passed:true}}),8);
  const analystPath=`/api/recoveries/${high.id}/analysis`;
  assert.equal((await fetch(base+analystPath)).status,401);
  assert.equal((await request(analystPath,'POST',{requestId:randomUUID()},{origin:'https://attacker.example'})).status,403);

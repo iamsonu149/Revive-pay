@@ -1,228 +1,32 @@
 'use client';
+import {useEffect,useState} from 'react';
+import {AlertTriangle,Bot,CheckCircle2,KeyRound,Save,Shield,Webhook,Zap} from 'lucide-react';
 
-import {useEffect, useState} from 'react';
-import {Shield, Users, Zap, Save, AlertTriangle, CheckCircle2} from 'lucide-react';
-import {clsx} from 'clsx';
+type Settings={autoRecoveryLimit:number;maxContacts:number;killSwitch:boolean;maxRetries:number;minRecoveryScore:number;minPaymentAmount:number;approvalAmountThreshold:number;quietHoursStart:number;quietHoursEnd:number;retryDelayHours:number;allowedRecoveryActions:string[];neverRetryFailureReasons:string[];provider:{displayName:string;activeMode:'mock'|'razorpay_test';configured:boolean;fallbackReason:string|null};webhookConfigured:boolean;ai:{configured:boolean;model:string;fallbackActive:boolean}};
+type Impact={total:number;automated:number;blocked:number;approval:number;calculatedAt:string};
+const optionalReasons=['INSUFFICIENT_FUNDS','BANK_TECHNICAL','EXPIRED_CARD','EXPIRED_MANDATE','CUSTOMER_ABANDONMENT','UNKNOWN_FAILURE'];
+const mandatory=['CANCELLED_SUBSCRIPTION','REFUND','SUSPECTED_CHARGEBACK','CHARGEBACK'];
+const payload=(s:Settings)=>({autoRecoveryLimit:s.autoRecoveryLimit,maxContacts:s.maxContacts,killSwitch:s.killSwitch,maxRetries:s.maxRetries,minRecoveryScore:s.minRecoveryScore,minPaymentAmount:s.minPaymentAmount,approvalAmountThreshold:s.approvalAmountThreshold,quietHoursStart:s.quietHoursStart,quietHoursEnd:s.quietHoursEnd,retryDelayHours:s.retryDelayHours,allowedRecoveryActions:s.allowedRecoveryActions,neverRetryFailureReasons:s.neverRetryFailureReasons});
 
-type Settings = {autoRecoveryLimit: number; maxContacts: number; killSwitch: boolean};
-
-function SettingRow({
-  icon: Icon,
-  label,
-  description,
-  children,
-}: {
-  icon: React.ElementType;
-  label: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-4 border-b border-slate-100 py-5 last:border-0 sm:flex-row sm:items-start sm:gap-8">
-      <div className="flex items-start gap-3 sm:w-64 shrink-0">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
-          <Icon size={15} />
-        </span>
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{label}</p>
-          <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">{description}</p>
-        </div>
-      </div>
-      <div className="flex-1">{children}</div>
-    </div>
-  );
+export default function SettingsPage(){
+ const [settings,setSettings]=useState<Settings|null>(null),[impact,setImpact]=useState<Impact|null>(null),[message,setMessage]=useState(''),[error,setError]=useState(false),[pending,setPending]=useState(false),[confirming,setConfirming]=useState(false);
+ async function preview(next:Settings){const response=await fetch('/api/settings/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(next))});const body=await response.json();if(!response.ok)throw Error(body.error);setImpact(body);}
+ useEffect(()=>{let active=true;fetch('/api/settings',{cache:'no-store'}).then(async response=>{const body=await response.json();if(!response.ok)throw Error(body.error);if(active){setSettings(body);void preview(body);}}).catch(value=>{if(active){setError(true);setMessage(String(value));}});return()=>{active=false};},[]);
+ async function save(){if(!settings)return;setPending(true);setMessage('');setError(false);try{const response=await fetch('/api/settings',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(settings))});const body=await response.json();if(!response.ok)throw Error(body.error);setSettings(body);await preview(body);setMessage('Recovery policy saved and audited.');setConfirming(false);}catch(value){setError(true);setMessage(value instanceof Error?value.message:'Could not save policy.');}finally{setPending(false);}}
+ const setNumber=(key:keyof Settings,value:number)=>settings&&setSettings({...settings,[key]:value});
+ const toggle=(list:'allowedRecoveryActions'|'neverRetryFailureReasons',value:string)=>settings&&setSettings({...settings,[list]:settings[list].includes(value)?settings[list].filter(item=>item!==value):[...settings[list],value]});
+ if(!settings)return <div className="p-8"><div className="skeleton h-96 max-w-5xl"/>{message&&<p className="mt-4 text-red-700">{message}</p>}</div>;
+ return <div className="p-8 animate-fade-in"><div className="mb-8"><p className="page-eyebrow">Merchant configuration</p><h2 className="page-title">Recovery policy and connections</h2><p className="mt-2 max-w-2xl text-sm text-slate-500">Hard safety boundaries can only be tightened. Secrets remain server-side and are never displayed here.</p></div>
+   <div className="grid gap-4 md:grid-cols-3"><Status icon={KeyRound} label="Payment provider" value={settings.provider.displayName} good={settings.provider.configured} detail={settings.provider.fallbackReason?'Safe mock fallback active':'Configured from server environment'}/><Status icon={Webhook} label="Webhook readiness" value={settings.webhookConfigured?'Signature secret configured':'Not configured'} good={settings.webhookConfigured} detail="Raw-body HMAC verification"/><Status icon={Bot} label="AI analyst" value={settings.ai.configured?settings.ai.model:'Deterministic fallback'} good={settings.ai.configured} detail={settings.ai.fallbackActive?'No provider calls are made':'Advisory only; no execution authority'}/></div>
+   {message&&<div className={`callout mt-5 ${error?'callout-danger':'callout-success'}`}>{error?<AlertTriangle size={15}/>:<CheckCircle2 size={15}/>}<p>{message}</p></div>}
+   <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_320px]"><form className="card card-static" onSubmit={event=>{event.preventDefault();setConfirming(true);void preview(settings);}}><div className="border-b border-slate-100 px-6 py-4"><h3 className="section-title">Deterministic recovery controls</h3><p className="mt-1 text-xs text-slate-500">All values are validated and enforced again by the server at approval and execution time.</p></div><div className="grid gap-5 p-6 sm:grid-cols-2 lg:grid-cols-3">
+     <NumberField label="Maximum automatic retries" value={settings.maxRetries} min={0} max={1} onChange={value=>setNumber('maxRetries',value)} note="Mandatory hard cap: 1"/><NumberField label="Minimum recovery score" value={settings.minRecoveryScore} min={0} max={95} onChange={value=>setNumber('minRecoveryScore',value)} note="0–95 heuristic score"/><NumberField label="Minimum payment amount" value={settings.minPaymentAmount} min={0} max={100000} onChange={value=>setNumber('minPaymentAmount',value)} note="INR"/><NumberField label="Approval threshold" value={settings.approvalAmountThreshold} min={0} max={10000} onChange={value=>setNumber('approvalAmountThreshold',value)} note="Cannot exceed ₹10,000"/><NumberField label="Contacts in seven days" value={settings.maxContacts} min={0} max={2} onChange={value=>setNumber('maxContacts',value)} note="Mandatory hard cap: 2"/><NumberField label="Retry delay" value={settings.retryDelayHours} min={24} max={168} onChange={value=>setNumber('retryDelayHours',value)} note="Hours; minimum 24"/><NumberField label="Quiet hours start" value={settings.quietHoursStart} min={0} max={23} onChange={value=>setNumber('quietHoursStart',value)} note="Hour in Asia/Kolkata"/><NumberField label="Quiet hours end" value={settings.quietHoursEnd} min={0} max={23} onChange={value=>setNumber('quietHoursEnd',value)} note="Hour in Asia/Kolkata"/>
+     <label className="rounded-xl border border-red-200 bg-red-50 p-4"><span className="flex items-center gap-2 text-sm font-semibold text-red-900"><Shield size={15}/>Global kill switch</span><span className="mt-2 flex items-center gap-2 text-xs text-red-800"><input type="checkbox" checked={settings.killSwitch} onChange={event=>setSettings({...settings,killSwitch:event.target.checked})}/>{settings.killSwitch?'All new executions blocked':'Execution enabled'}</span></label>
+   </div><div className="grid gap-5 border-t border-slate-100 p-6 lg:grid-cols-2"><fieldset><legend className="text-sm font-semibold text-slate-900">Allowed recovery actions</legend><div className="mt-3 space-y-2">{[['RETRY_LATER','Schedule one retry'],['SEND_PAYMENT_UPDATE_LINK','Create payment update link']].map(([value,name])=><label key={value} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={settings.allowedRecoveryActions.includes(value)} onChange={()=>toggle('allowedRecoveryActions',value)}/>{name}</label>)}</div></fieldset><fieldset><legend className="text-sm font-semibold text-slate-900">Never retry failure reasons</legend><p className="mt-1 text-xs text-slate-500">Mandatory hard stops cannot be removed.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{[...mandatory,...optionalReasons].map(value=><label key={value} className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" disabled={mandatory.includes(value)} checked={settings.neverRetryFailureReasons.includes(value)} onChange={()=>toggle('neverRetryFailureReasons',value)}/>{value.replaceAll('_',' ')}</label>)}</div></fieldset></div><div className="border-t border-slate-100 p-5">{confirming?<div className="callout callout-warning items-start"><AlertTriangle size={16}/><div className="flex-1"><p className="font-semibold">Confirm policy change</p><p className="mt-1 text-xs">This changes which cases can be automated, blocked, or require approval. Existing executions are not recalled.</p><div className="mt-3 flex gap-2"><button type="button" className="btn-warning" disabled={pending} onClick={()=>void save()}>{pending?'Saving…':'Confirm and save'}</button><button type="button" className="btn-ghost" onClick={()=>setConfirming(false)}>Cancel</button></div></div></div>:<button type="submit" className="btn-primary"><Save size={14}/>Review policy changes</button>}</div></form>
+   <aside className="card card-static h-fit"><div className="border-b border-slate-100 p-5"><h3 className="section-title">Read-only impact preview</h3><p className="mt-1 text-xs text-slate-500">Calculated from current persisted, unexecuted cases.</p></div>{impact?<div className="grid grid-cols-2 gap-3 p-5"><Impact label="Eligible cases" value={impact.total}/><Impact label="Automated" value={impact.automated} color="text-emerald-700"/><Impact label="Needs approval" value={impact.approval} color="text-amber-700"/><Impact label="Blocked" value={impact.blocked} color="text-red-700"/><p className="col-span-2 text-[11px] text-slate-400">Calculated {new Date(impact.calculatedAt).toLocaleString('en-IN')}</p></div>:<div className="p-5 text-sm text-slate-500">Calculating preview…</div>}<div className="border-t border-slate-100 p-5"><button type="button" className="btn-ghost w-full justify-center" onClick={()=>void preview(settings)}><Zap size={14}/>Refresh preview</button></div></aside></div>
+ </div>;
 }
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [message, setMessage] = useState('');
-  const [isError, setIsError] = useState(false);
-  const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/settings', {cache: 'no-store'})
-      .then(async r => {
-        const b = await r.json();
-        if (!r.ok) throw Error(b.error);
-        if (active)
-          setSettings({
-            autoRecoveryLimit: b.autoRecoveryLimit,
-            maxContacts: b.maxContacts,
-            killSwitch: b.killSwitch,
-          });
-      })
-      .catch(e => {
-        if (active) {
-          setIsError(true);
-          setMessage(String(e));
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function save() {
-    if (!settings) return;
-    setPending(true);
-    setMessage('');
-    setIsError(false);
-    try {
-      const r = await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(settings),
-      });
-      const b = await r.json();
-      if (!r.ok) throw Error(b.error);
-      setSettings({
-        autoRecoveryLimit: b.autoRecoveryLimit,
-        maxContacts: b.maxContacts,
-        killSwitch: b.killSwitch,
-      });
-      setMessage('Settings saved successfully.');
-    } catch (e) {
-      setIsError(true);
-      setMessage(e instanceof Error ? e.message : 'Could not save settings.');
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div className="p-8 animate-fade-in">
-      <div className="mb-8">
-        <p className="page-eyebrow">Merchant configuration</p>
-        <h2 className="page-title">Settings</h2>
-      </div>
-
-      {!settings ? (
-        <div className="card max-w-2xl p-6 space-y-5">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="flex gap-4">
-              <div className="skeleton h-8 w-8 rounded-lg shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="skeleton h-4 w-40" />
-                <div className="skeleton h-3 w-64" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            void save();
-          }}
-          className="card max-w-2xl"
-        >
-          <div className="border-b border-slate-100 px-6 py-4">
-            <h3 className="section-title">Recovery limits</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Limits can be tightened. Approval above ₹10,000 and the maximum of two contacts remain mandatory.
-            </p>
-          </div>
-
-          <div className="px-6">
-            <SettingRow
-              icon={Zap}
-              label="Auto-recovery amount limit"
-              description="Cases above this limit require manual approval before execution. Hard cap: ₹10,000."
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-slate-600">₹</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={10000}
-                  step={1}
-                  required
-                  value={settings.autoRecoveryLimit}
-                  onChange={e =>
-                    setSettings({...settings, autoRecoveryLimit: e.target.valueAsNumber})
-                  }
-                  className="input max-w-[160px]"
-                  aria-label="Auto-recovery amount limit in INR"
-                />
-                <span className="text-xs text-slate-400">INR · max ₹10,000</span>
-              </div>
-            </SettingRow>
-
-            <SettingRow
-              icon={Users}
-              label="Maximum contacts in seven days"
-              description="Per-customer contact limit across the rolling 7-day window. Hard cap: 2."
-            >
-              <input
-                type="number"
-                min={0}
-                max={2}
-                step={1}
-                required
-                value={settings.maxContacts}
-                onChange={e =>
-                  setSettings({...settings, maxContacts: e.target.valueAsNumber})
-                }
-                className="input max-w-[100px]"
-                aria-label="Maximum contacts in seven days"
-              />
-            </SettingRow>
-
-            <SettingRow
-              icon={Shield}
-              label="Merchant kill switch"
-              description="When enabled, all automated payment execution is blocked immediately. Use in emergencies."
-            >
-              <label className="flex cursor-pointer items-center gap-3">
-                {/* Toggle switch — pure CSS + checkbox */}
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={settings.killSwitch}
-                    onChange={e => setSettings({...settings, killSwitch: e.target.checked})}
-                    className="peer sr-only"
-                    aria-label="Enable merchant kill switch"
-                  />
-                  <div className="h-5 w-9 rounded-full bg-slate-200 peer-checked:bg-red-500 transition-colors duration-200" />
-                  <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
-                </div>
-                <span
-                  className={clsx(
-                    'text-sm font-semibold transition-colors',
-                    settings.killSwitch ? 'text-red-600' : 'text-slate-500',
-                  )}
-                >
-                  {settings.killSwitch ? 'Kill switch enabled — execution blocked' : 'Kill switch off'}
-                </span>
-              </label>
-              {settings.killSwitch && (
-                <div className="callout callout-danger mt-3">
-                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                  <p className="text-xs">All automated payment execution is currently blocked.</p>
-                </div>
-              )}
-            </SettingRow>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-            <p className="text-xs text-slate-400">Provider: Mock Razorpay</p>
-            <button disabled={pending} type="submit" className="btn-primary">
-              {pending ? <span className="spinner" /> : <Save size={14} />}
-              {pending ? 'Saving…' : 'Save settings'}
-            </button>
-          </div>
-
-          {message && (
-            <div className={clsx('callout mx-6 mb-4 animate-slide-up text-xs', isError ? 'callout-danger' : 'callout-success')}>
-              {isError
-                ? <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                : <CheckCircle2 size={14} className="shrink-0 mt-0.5" />}
-              {message}
-            </div>
-          )}
-        </form>
-      )}
-    </div>
-  );
-}
+function Status({icon:Icon,label,value,good,detail}:{icon:React.ElementType;label:string;value:string;good:boolean;detail:string}){return <div className="card card-static p-5"><div className="flex items-center justify-between"><Icon size={17} className="text-slate-500"/><span className={`h-2 w-2 rounded-full ${good?'bg-emerald-500':'bg-amber-500'}`}/></div><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p><p className="mt-1 font-semibold text-slate-900">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div>}
+function NumberField({label,value,min,max,onChange,note}:{label:string;value:number;min:number;max:number;onChange:(value:number)=>void;note:string}){return <label><span className="text-sm font-semibold text-slate-800">{label}</span><input className="input mt-2" type="number" min={min} max={max} value={value} onChange={event=>onChange(event.target.valueAsNumber)}/><span className="mt-1 block text-xs text-slate-400">{note}</span></label>}
+function Impact({label,value,color='text-slate-900'}:{label:string;value:number;color?:string}){return <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 text-2xl font-bold tabular-nums ${color}`}>{value}</p></div>}

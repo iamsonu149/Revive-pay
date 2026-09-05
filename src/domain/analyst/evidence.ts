@@ -1,5 +1,5 @@
 import {AttemptSignals, Action} from '../recovery/types';
-import {approvalRequired, RecoveryError, RecoveryPolicy} from '../recovery/policy';
+import {approvalRequired, defaultPolicy, RecoveryError, RecoveryPolicy} from '../recovery/policy';
 
 export const actions = ['RETRY_LATER', 'SEND_PAYMENT_UPDATE_LINK', 'NEEDS_REVIEW', 'STOP'] as const;
 const failures = ['BANK_TECHNICAL', 'INSUFFICIENT_FUNDS', 'EXPIRED_CARD', 'EXPIRED_MANDATE', 'CUSTOMER_ABANDONMENT', 'CANCELLED_SUBSCRIPTION', 'REFUND', 'SUSPECTED_CHARGEBACK', 'CHARGEBACK', 'UNKNOWN_FAILURE'] as const;
@@ -88,6 +88,6 @@ export function evidenceSignals(e: AnalystEvidence): AttemptSignals {
   };
 }
 export const evidencePolicy = (e: AnalystEvidence): RecoveryPolicy => ({
-  autoRecoveryLimit: e.autoRecoveryLimitInr, maxContacts: e.maxContactsIn7Days, killSwitch: e.killSwitchEnabled,
+  ...defaultPolicy, autoRecoveryLimit: e.autoRecoveryLimitInr, maxContacts: e.maxContactsIn7Days, killSwitch: e.killSwitchEnabled,
 });
 export const isAction = (value: unknown): value is Action => typeof value === 'string' && actions.includes(value as Action);

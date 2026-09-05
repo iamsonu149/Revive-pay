@@ -1,4 +1,4 @@
-export function Topbar() {
+export function Topbar({providerName,providerMode}:{providerName:string;providerMode:'mock'|'razorpay_test'}) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-md px-8 gap-4 shadow-sm">
       <div>
@@ -10,7 +10,7 @@ export function Topbar() {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
         </span>
-        <span className="text-[11px] font-medium text-slate-600 tracking-wide">Synthetic outcomes</span>
+        <span className="text-[11px] font-medium text-slate-600 tracking-wide">{providerMode==='mock'?'Synthetic outcomes':providerName}</span>
       </div>
     </header>
   );

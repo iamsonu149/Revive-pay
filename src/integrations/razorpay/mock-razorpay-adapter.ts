@@ -4,6 +4,9 @@ import {ProviderResult, RazorpayAdapter} from './razorpay-adapter';
 
 /** Durable mock provider ledger: identical keys return the original outcome. */
 export class MockRazorpayAdapter implements RazorpayAdapter {
+ readonly mode='mock' as const;
+ readonly displayName='Mock Razorpay';
+ readonly capabilities={retry:true,paymentLinks:true};
  constructor(private client:PrismaClient=db) {}
  private async perform(paymentId:string, key:string, action:string):Promise<ProviderResult> {
    const previous=await this.client.mockProviderOperation.findUnique({where:{id:key}});

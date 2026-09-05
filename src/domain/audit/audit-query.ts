@@ -16,6 +16,7 @@ export function auditSearchWhere(query: string): Prisma.AuditEventWhereInput {
       {eventType: {contains: eventCode}},
       {actor: {contains: q}},
       {recoveryCaseId: {contains: q}},
+      {payload: {contains: q}},
     ],
   };
 }

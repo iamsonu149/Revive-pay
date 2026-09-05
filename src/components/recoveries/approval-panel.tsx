@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {CheckCircle2, Play, RefreshCw, Lock, XCircle, Clock} from 'lucide-react';
+import {CheckCircle2, Play, RefreshCw, Lock, XCircle, Clock, ExternalLink} from 'lucide-react';
 import {clsx} from 'clsx';
 
 /* ── inline mini-toast (no provider needed here) ─────────────────────── */
@@ -30,6 +30,8 @@ export function ApprovalPanel({
   action,
   scheduledFor,
   hasExecution = false,
+  providerMode,
+  recoveryUrl,
 }: {
   id: string;
   status: string;
@@ -37,12 +39,16 @@ export function ApprovalPanel({
   action: string;
   scheduledFor?: string | null;
   hasExecution?: boolean;
+  providerMode:'mock'|'razorpay_test';
+  recoveryUrl?:string|null;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [pending, setPending] = useState(false);
   const [decision, setDecision] = useState('SEND_PAYMENT_UPDATE_LINK');
+  const [confirmation,setConfirmation]=useState<string|null>(null);
+  const [rejectionReason,setRejectionReason]=useState('Not suitable for recovery');
 
   async function call(kind: string) {
     if (pending) return;
@@ -53,15 +59,15 @@ export function ApprovalPanel({
       const r = await fetch(`/api/recoveries/${id}/${kind}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(kind === 'approve' && action === 'NEEDS_REVIEW' ? {action: decision} : {}),
+        body: JSON.stringify(kind==='reject'?{reason:rejectionReason}:kind==='approve'?{action:action==='NEEDS_REVIEW'?decision:action}:{}),
       });
       const b = await r.json();
       if (!r.ok) throw Error(b.error);
       setMessage(
         b.status === 'RECOVERED'
-          ? 'Payment confirmed by the mock provider.'
+          ? 'Payment confirmed by the provider.'
           : b.status === 'EXECUTED'
-          ? 'Payment link sent; awaiting payment confirmation.'
+          ? 'Payment link created; awaiting a verified payment confirmation.'
           : b.status === 'APPROVED'
           ? 'Decision approved.'
           : `Case status: ${b.status}`,
@@ -73,11 +79,12 @@ export function ApprovalPanel({
       );
     } finally {
       setPending(false);
+      setConfirmation(null);
       router.refresh();
     }
   }
 
-  const terminal = ['RECOVERED', 'FAILED'].includes(status);
+  const terminal = ['RECOVERED', 'FAILED','REJECTED'].includes(status);
   const needsApproval = required || action === 'NEEDS_REVIEW' || status === 'NEEDS_REVIEW';
   const future =
     action === 'RETRY_LATER' && !!scheduledFor && new Date(scheduledFor).getTime() > Date.now();
@@ -127,14 +134,11 @@ export function ApprovalPanel({
             Reconcile provider outcome
           </button>
           {status === 'EXECUTED' && action === 'SEND_PAYMENT_UPDATE_LINK' && (
-            <button
-              disabled={pending}
-              className="btn-success"
-              onClick={() => void call('confirm-mock')}
-            >
-              {pending ? <span className="spinner" /> : <CheckCircle2 size={14} />}
-              Simulate customer payment (mock)
-            </button>
+            providerMode==='mock' ? <button disabled={pending} className="btn-success" onClick={() => setConfirmation('confirm-mock')}>
+              {pending ? <span className="spinner" /> : <CheckCircle2 size={14} />} Simulate customer payment (mock)
+            </button> : recoveryUrl ? <a className="btn-success" href={recoveryUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={14}/> Open secure payment page
+            </a> : null
           )}
         </div>
       ) : (
@@ -154,17 +158,18 @@ export function ApprovalPanel({
               )}
               <button
                 disabled={pending}
-                onClick={() => void call('approve')}
+                onClick={() => setConfirmation('approve')}
                 className="btn-warning"
               >
                 {pending ? <span className="spinner" /> : <Lock size={14} />}
                 Approve decision
               </button>
+              <button disabled={pending} onClick={()=>setConfirmation('reject')} className="btn-ghost text-red-700"><XCircle size={14}/>Reject case</button>
             </>
           )}
           <button
             disabled={pending || future || (needsApproval && status !== 'APPROVED')}
-            onClick={() => void call('execute')}
+            onClick={() => setConfirmation('execute')}
             className="btn-success"
           >
             {pending ? <span className="spinner" /> : <Play size={14} />}
@@ -181,6 +186,8 @@ export function ApprovalPanel({
           </p>
         </div>
       )}
+
+      {confirmation&&<div className="callout callout-warning mt-4 items-start"><Lock size={15} className="mt-0.5 shrink-0"/><div className="flex-1"><p className="font-semibold">Confirm {confirmation==='execute'?'provider execution':confirmation==='approve'?'approval':confirmation==='reject'?'rejection':'mock payment confirmation'}</p><p className="mt-1 text-xs">Safeguards will be checked again by the server and the decision will be audited.</p>{confirmation==='reject'&&<input className="input mt-3" value={rejectionReason} onChange={event=>setRejectionReason(event.target.value)} aria-label="Rejection reason"/>}<div className="mt-3 flex gap-2"><button className={confirmation==='reject'?'btn-danger':'btn-warning'} disabled={pending||confirmation==='reject'&&rejectionReason.trim().length<3} onClick={()=>void call(confirmation)}>{pending?'Working…':'Confirm'}</button><button className="btn-ghost" disabled={pending} onClick={()=>setConfirmation(null)}>Cancel</button></div></div></div>}
 
       <StatusMessage message={message} isError={isError} />
     </div>

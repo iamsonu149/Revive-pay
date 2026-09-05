@@ -1,8 +1,8 @@
 import {db} from '../../lib/db';
 import {scoreRecovery} from '../recovery/recovery-scorer';
 import {approvalRequired,hardStop} from '../recovery/policy';
-import {simulate,strategies,SimulationRow} from './simulator';
-export async function simulationMetrics(save=false,actor='SYSTEM') {
+import {simulate,strategies,SimulationRow,defaultAssumptions,markPareto,classifyDeployability,type SimulationAssumptions} from './simulator';
+export async function simulationMetrics(save=false,actor='SYSTEM',assumptions:SimulationAssumptions=defaultAssumptions) {
  const now=new Date();
  const settings=await db.setting.upsert({where:{id:'merchant'},update:{},create:{id:'merchant'}});
  const cases=await db.recoveryCase.findMany({where:{paymentAttempt:{status:'FAILED'},execution:null},include:{paymentAttempt:{include:{subscription:true,customer:{include:{contacts:{where:{createdAt:{gt:new Date(now.getTime()-7*86400000)}}}}}}}},orderBy:{id:'asc'}});
@@ -14,9 +14,10 @@ export async function simulationMetrics(save=false,actor='SYSTEM') {
    const action=stopped||settings.killSwitch?'STOP':needsApproval?'NEEDS_REVIEW':decision.recommendation==='NEEDS_REVIEW'&&c.status==='APPROVED'?c.recommendedAction:decision.recommendation;
    return {id:c.id,amount:signals.amount,status:c.status,recommendedAction:action,predictedRecoveryProbability:decision.probability,unsafeRetry:stopped||['EXPIRED_CARD','EXPIRED_MANDATE'].includes(signals.failureReason)};
  });
- const result=strategies.map(s=>simulate(rows,s));
+ const a={retryCost:Math.max(0,Math.min(1000,assumptions.retryCost)),contactCost:Math.max(0,Math.min(1000,assumptions.contactCost)),riskLoss:Math.max(0,Math.min(100000,assumptions.riskLoss)),churnCost:Math.max(0,Math.min(100000,assumptions.churnCost)),seed:Math.max(1,Math.min(999999,Math.round(assumptions.seed)))};
+ const result=classifyDeployability(markPareto(strategies.map(s=>simulate(rows,s,a))));
  if(save)await db.$transaction(async tx=>{
-   await tx.simulationRun.createMany({data:result});
+   await tx.simulationRun.createMany({data:result.map(({paretoEfficient,deployable,safetyViolationReasons,bestDeployable,...x})=>x)});
    await tx.auditEvent.create({data:{eventType:'SIMULATION_RUN',actor,payload:JSON.stringify({asOf:now,results:result})}});
  });
  return result;

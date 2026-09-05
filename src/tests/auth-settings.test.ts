@@ -26,3 +26,4 @@ it('accepts the actual browser host when Next normalizes its internal URL',()=>{
 it.each([{autoRecoveryLimit:10001},{autoRecoveryLimit:-1},{maxContacts:3},{maxContacts:1.5},{killSwitch:'false'},{autoRecoveryLimit:'5000'},{unknown:true},null])('rejects invalid or weakened settings %j',value=>{
  expect(()=>validateSettings(value)).toThrow();
 });
+it.each([{maxRetries:2},{minRecoveryScore:101},{approvalAmountThreshold:10001},{retryDelayHours:23},{quietHoursStart:24},{allowedRecoveryActions:[]},{allowedRecoveryActions:['DELETE_PAYMENT']},{neverRetryFailureReasons:['UNKNOWN']}])('rejects unsafe merchant policy %j',value=>expect(()=>validateSettings(value)).toThrow());

@@ -18,6 +18,25 @@ npm run dev
 
 Open http://localhost:3000/dashboard. The browser requests merchant credentials; read `MERCHANT_USER` and `MERCHANT_PASSWORD` from your local `.env`. Authentication fails closed if credentials are missing or the password is shorter than 16 characters. All pages and API routes require the single merchant administrator identity. API handlers authorize independently of middleware, reject cross-origin mutations, and record the authenticated actor. Keep `.env` private. Use HTTPS if exposing the app beyond localhost; browser Basic authentication is intended for this single-merchant local demo, not a multi-tenant identity system.
 
+## Payment provider modes and Razorpay Test Mode
+
+`PAYMENT_PROVIDER=mock` remains the safe default. Mock mode retains deterministic retries, durable payment-link operations, reconciliation and manual customer-payment confirmation for the local demo.
+
+To use Razorpay Test Mode, configure server-side values in `.env` and restart the app:
+
+```dotenv
+PAYMENT_PROVIDER=razorpay_test
+RAZORPAY_KEY_ID=rzp_test_your_key_id
+RAZORPAY_KEY_SECRET=your_test_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_separate_webhook_secret
+```
+
+Only `rzp_test_` key IDs are accepted. Missing credentials or a live key cause a visible, safe fallback to the mock provider. Secrets are never returned to the browser or written to audit payloads. Razorpay API requests use server-side Basic authentication, a 12-second deadline and no automatic provider notifications. The app creates one Payment Link for a claimed payment-update action and exposes its hosted payment URL on the case page. An arbitrary failed payment cannot be replayed through a generic Razorpay API, so direct retry actions are blocked in Razorpay Test Mode rather than silently changing their meaning.
+
+Configure the public webhook URL as `https://your-host/api/webhooks/razorpay`. The route is intentionally outside merchant Basic authentication because Razorpay authenticates with `X-Razorpay-Signature`; it reads the raw body with a 64 KB limit and verifies HMAC SHA-256 before parsing. Subscribe to the events used by the demo: `payment.failed`, `payment.captured`, `order.paid`, `payment_link.paid`, `subscription.pending` and `subscription.halted`. The event ID is atomically claimed before processing, so duplicate delivery cannot create a second case or provider action. The database stores bounded event metadata and a SHA-256 payload fingerprint, not raw webhook bodies.
+
+A verified failed-payment event creates a provider-linked payment attempt, recovery case, deterministic recommendation and audit trail. A verified paid event resolves the existing execution by Payment Link reference or the server-generated recovery note, marks the payment successful, closes the case and updates recovered revenue. Provider timeouts retain the original execution claim in `NEEDS_REVIEW`; subsequent execution attempts remain blocked and reconciliation never creates another link.
+
 `db:seed` **replaces demo data**, including audit history and settings. Do not run it to upgrade an existing database. This workspace was upgraded with a backup under `prisma/backups/`; existing cases were retained. On an older unversioned database, back up first, apply the schema with `prisma db push`, baseline both included migrations (`202609050001_recovery_safety` and `202609050002_approval_amount`) with `prisma migrate resolve --applied <name>`, then run `npm run db:backfill`. Backfill locks legacy executions for review and conservatively timestamps old contact counters for seven days. Legacy provider outcomes cannot be reconstructed automatically.
 
 ## AI Recovery Analyst (optional Gemini integration)
@@ -76,17 +95,6 @@ The worker checks due retries every 30 seconds, up to 100 cases per batch. It us
 - The kill switch blocks admission of new actions; it cannot recall a provider request already admitted. Reconciliation of existing operations remains available while enabled.
 - Audit writes for claims, approval, settings and outcomes share transactions with their state changes. Provider errors and blocked policy actions are also logged.
 
-## Demo walkthrough
-
-1. Dashboard starts at zero recovered revenue and displays actual database outcomes.
-2. Open a due bank-technical case and execute its one retry.
-3. Open a payment over ₹10,000 and approve before execution.
-4. Open a review case, choose an action explicitly, and approve it.
-5. Send an expired-card payment link, then simulate customer payment to see revenue and audit updates.
-6. Inspect cancellation/refund/chargeback, retry-limit and contact-cap cases.
-7. The seeded `outage-attempt` escalates to review. Repeated execution stays blocked.
-8. Change settings, reload, and verify that the saved kill switch and limits persist.
-
 Operational pages and API reads are dynamic and uncached. Queue and audit searches work, and audit entries are paginated. The simulator compares the current unexecuted failed cases using the same deterministic draw and heuristic score for every strategy. Review/stopped actions recover nothing; no strategy receives an artificial success bonus. Simulated outcomes and contact pressure are illustrative, not evidence of production lift.
 
 ## Verification
@@ -98,6 +106,37 @@ npm run build
 npm run test:smoke
 ```
 
-Tests cover real SQLite concurrency, contact reservations, retry boundaries, live status/amount checks, approval, schedules, kill switch, outages, lost responses, database finalization failures, reconciliation, settings, authentication and simulator behavior. They use isolated temporary databases. The smoke check requires a completed production build and starts an isolated local server.
+Tests cover real SQLite concurrency, contact reservations, retry boundaries, live status/amount checks, approval, schedules, kill switch, outages, lost responses, database finalization failures, reconciliation, settings, authentication, simulator behavior, provider selection, raw-body signature validation, invalid payloads, duplicate webhooks, server-side Razorpay authentication, Payment Link creation and verified webhook completion. They use isolated temporary databases. The smoke check requires a completed production build and starts an isolated local server.
 
-The provider remains a mock. `RazorpayTestAdapter` is an alias of that mock, not a live Razorpay integration. A real integration must implement the adapter's idempotency and lookup contract, authenticate provider confirmations and preserve the same service safeguards.
+Razorpay Test Mode is optional. Without its environment variables, every existing workflow continues to use the durable mock provider.
+
+## Merchant controls and judge demo
+
+The Approval Center separates advisory AI diagnosis from authoritative policy, shows risk and expected value, and supports adjustment, rejection, individual approval and bounded bulk approval. Every action reloads persisted state and rechecks hard safeguards. Settings exposes provider/webhook/AI readiness plus persisted policy controls and a read-only impact preview; changes require an explicit review-and-confirm step.
+
+Webhook Operations lists delivery IDs, event types, signature state, duplicates, latency, linked cases, outcomes and retry/dead-letter state. Safety Lab is deliberately available only in mock mode and exercises concurrent delivery, duplicate execution, provider timeout, stale reservations, invalid signatures, unsafe retries, the kill switch and the contact ceiling. It records reproducible audit evidence but never calls Razorpay.
+
+The simulator uses the same persisted eligible cases for every strategy. All figures are synthetic, not a prediction of production lift. Gross recovery is reduced by explicit retry, contact, unsafe-action and customer-pressure assumptions. The deterministic seed becomes the replay ID. A Pareto label means no displayed alternative has both equal-or-better net value and equal-or-lower customer pressure. Deployability is stricter: zero unsafe retries and customer pressure no greater than 3/10. The best deployable strategy is the eligible strategy with the highest risk-adjusted net value.
+
+### Three-act five-minute pitch
+
+1. **Act 1 — Decision (0:00–1:30):** start on Judge Demo and Dashboard, then open Approval Center. Contrast advisory AI diagnosis with the deterministic policy gate and merchant approval.
+2. **Act 2 — Safe execution (1:30–3:15):** execute one bounded recovery action, show its persisted timeline, then use Safety Lab and Webhook Operations to prove signature validation, exactly-once claims, hard stops and timeout reconciliation.
+3. **Act 3 — Proof at scale (3:15–5:00):** compare the same eligible batch in the simulator. Explain the deployment gate, why unsafe retry-all is rejected even when economically Pareto-efficient, and finish with verified outcomes separated from reproducible synthetic evidence.
+
+### Architecture
+
+```mermaid
+flowchart LR
+  A[Razorpay webhook] --> B[Detection]
+  B --> C[AI diagnosis]
+  C --> D[Deterministic policy gate]
+  D --> E[Merchant approval]
+  E --> F[Recovery execution]
+  F --> G[Verified outcome]
+  G --> H[Audit trail]
+```
+
+Architecture boundary: the UI and API routes orchestrate; domain services own policy and execution; the provider interface isolates mock and Razorpay Test Mode; SQLite constraints and transactions enforce deduplication and exactly-once claims.
+
+Known limitations: this is Test Mode only, outbound customer delivery remains provider-shaped/mock, dead-letter replay is displayed but not automated, and simulator economics are illustrative merchant assumptions rather than confirmed provider revenue or evidence of production lift.

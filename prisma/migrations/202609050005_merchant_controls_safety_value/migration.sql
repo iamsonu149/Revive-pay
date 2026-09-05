@@ -1,0 +1,54 @@
+ALTER TABLE "RecoveryCase" ADD COLUMN "rejectedAt" DATETIME;
+ALTER TABLE "RecoveryCase" ADD COLUMN "rejectionReason" TEXT;
+
+ALTER TABLE "ProviderWebhookEvent" ADD COLUMN "duplicateCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "ProviderWebhookEvent" ADD COLUMN "processingLatencyMs" INTEGER;
+ALTER TABLE "ProviderWebhookEvent" ADD COLUMN "retryStatus" TEXT NOT NULL DEFAULT 'NOT_REQUIRED';
+ALTER TABLE "ProviderWebhookEvent" ADD COLUMN "deadLetter" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "SimulationRun" ADD COLUMN "estimatedRetryCost" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "estimatedContactCost" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "expectedRiskLoss" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "estimatedChurnImpact" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "netRecoveredValue" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "recoveryPerRetry" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "recoveryPerContact" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "customersProtected" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "approvalWorkload" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "unsafeRetriesAttempted" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SimulationRun" ADD COLUMN "replayId" TEXT;
+ALTER TABLE "SimulationRun" ADD COLUMN "seed" INTEGER;
+
+ALTER TABLE "Setting" ADD COLUMN "maxRetries" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "Setting" ADD COLUMN "minRecoveryScore" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Setting" ADD COLUMN "minPaymentAmount" INTEGER NOT NULL DEFAULT 100;
+ALTER TABLE "Setting" ADD COLUMN "approvalAmountThreshold" INTEGER NOT NULL DEFAULT 10000;
+ALTER TABLE "Setting" ADD COLUMN "quietHoursStart" INTEGER NOT NULL DEFAULT 22;
+ALTER TABLE "Setting" ADD COLUMN "quietHoursEnd" INTEGER NOT NULL DEFAULT 8;
+ALTER TABLE "Setting" ADD COLUMN "retryDelayHours" INTEGER NOT NULL DEFAULT 24;
+ALTER TABLE "Setting" ADD COLUMN "allowedRecoveryActions" TEXT NOT NULL DEFAULT '["RETRY_LATER","SEND_PAYMENT_UPDATE_LINK"]';
+ALTER TABLE "Setting" ADD COLUMN "neverRetryFailureReasons" TEXT NOT NULL DEFAULT '["CANCELLED_SUBSCRIPTION","REFUND","SUSPECTED_CHARGEBACK","CHARGEBACK"]';
+
+CREATE TABLE "SafetyLabRun" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "scenario" TEXT NOT NULL,
+  "injected" TEXT NOT NULL,
+  "expectedInvariant" TEXT NOT NULL,
+  "timeline" TEXT NOT NULL,
+  "requestsReceived" INTEGER NOT NULL,
+  "accepted" INTEGER NOT NULL,
+  "duplicatesRejected" INTEGER NOT NULL,
+  "providerActions" INTEGER NOT NULL,
+  "finalState" TEXT NOT NULL,
+    "auditEvents" INTEGER NOT NULL,
+  "passed" BOOLEAN NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "SafetyLabClaim" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "runId" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "SafetyLabClaim_runId_idx" ON "SafetyLabClaim"("runId");

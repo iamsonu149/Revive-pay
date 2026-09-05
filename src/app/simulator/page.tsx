@@ -15,8 +15,7 @@ export default async function Simulator() {
         <p className="page-eyebrow">Synthetic batch simulator</p>
         <h2 className="page-title">Compare recovery strategies.</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-500 leading-relaxed">
-          Replay the current failed cases that have no execution. Outcomes are illustrative,
-          deterministic and do not measure production performance.
+          Replay the same persisted failed cases under explicit synthetic cost assumptions. Compare risk-adjusted net value, customer pressure and operational workload—not gross recovery alone.
         </p>
       </div>
 
@@ -46,7 +45,7 @@ export default async function Simulator() {
             decision engine uses current customer contact history, merchant limits and approval
             state. Unsafe retries cannot recover. Scheduled retries are modeled over the replay
             horizon. Payment-link outcomes model a possible later customer payment. Contact
-            pressure is a bounded synthetic index, not measured customer sentiment.
+            pressure is a bounded synthetic index, not measured customer sentiment. Costs, risk loss and churn impact are user-controlled assumptions. Pareto labels identify strategies not dominated on both net value and pressure. Every run stores its seed and replay ID.
           </p>
         </div>
       </details>

@@ -26,8 +26,12 @@ model Subscription {
   amount          Int
   status          String
   nextBillingDate DateTime
+  provider        String           @default("mock")
+  providerSubscriptionId String?
   customer        Customer         @relation(fields: [customerId], references: [id])
   attempts        PaymentAttempt[]
+
+  @@unique([provider, providerSubscriptionId])
 }
 
 model PaymentAttempt {
@@ -44,9 +48,14 @@ model PaymentAttempt {
   bankHealthScore          Int
   customerEngagementScore  Int
   contactCountLast7Days    Int
+  provider                 String        @default("mock")
+  providerPaymentId        String?
+  providerOrderId          String?
   subscription             Subscription  @relation(fields: [subscriptionId], references: [id])
   customer                 Customer      @relation(fields: [customerId], references: [id])
   recoveryCase             RecoveryCase?
+
+  @@unique([provider, providerPaymentId])
 }
 
 model RecoveryCase {
@@ -62,12 +71,15 @@ model RecoveryCase {
   scheduledFor                 DateTime?
   recoveredAmount              Int                @default(0)
   recoveredAt                  DateTime?
+  rejectedAt                   DateTime?
+  rejectionReason              String?
   createdAt                    DateTime           @default(now())
   updatedAt                    DateTime           @updatedAt
   paymentAttempt               PaymentAttempt     @relation(fields: [paymentAttemptId], references: [id])
   events                       AuditEvent[]
   execution                    RecoveryExecution?
   analyses                     RecoveryAnalysis[]
+  webhookEvents                ProviderWebhookEvent[]
 }
 
 model AuditEvent {
@@ -96,9 +108,37 @@ model RecoveryExecution {
   action            String
   status            String       @default("CLAIMED")
   providerReference String?
+  provider           String       @default("mock")
+  providerStatus     String?
+  recoveryUrl        String?
+  lastErrorCode      String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   recoveryCase      RecoveryCase @relation(fields: [recoveryCaseId], references: [id])
+
+  @@index([provider, providerReference])
+}
+
+model ProviderWebhookEvent {
+  id              String        @id
+  provider        String
+  providerEventId String?
+  eventType       String
+  signatureValid  Boolean
+  status          String
+  payloadHash     String
+  recoveryCaseId  String?
+  errorCode       String?
+  duplicateCount  Int           @default(0)
+  processingLatencyMs Int?
+  retryStatus     String        @default("NOT_REQUIRED")
+  deadLetter      Boolean       @default(false)
+  receivedAt      DateTime      @default(now())
+  processedAt     DateTime?
+  recoveryCase    RecoveryCase? @relation(fields: [recoveryCaseId], references: [id])
+
+  @@index([provider, providerEventId])
+  @@index([recoveryCaseId, receivedAt])
 }
 
 model MockProviderOperation {
@@ -121,6 +161,18 @@ model SimulationRun {
   messagesSent           Int
   avoidedBadRetries      Int
   customerAnnoyanceScore Int
+  estimatedRetryCost      Int      @default(0)
+  estimatedContactCost    Int      @default(0)
+  expectedRiskLoss        Int      @default(0)
+  estimatedChurnImpact    Int      @default(0)
+  netRecoveredValue       Int      @default(0)
+  recoveryPerRetry        Int      @default(0)
+  recoveryPerContact      Int      @default(0)
+  customersProtected      Int      @default(0)
+  approvalWorkload        Int      @default(0)
+  unsafeRetriesAttempted  Int      @default(0)
+  replayId                String?
+  seed                    Int?
   createdAt              DateTime @default(now())
 }
 
@@ -129,7 +181,73 @@ model Setting {
   autoRecoveryLimit Int      @default(10000)
   maxContacts       Int      @default(2)
   killSwitch        Boolean  @default(false)
+  maxRetries        Int      @default(1)
+  minRecoveryScore  Int      @default(0)
+  minPaymentAmount  Int      @default(100)
+  approvalAmountThreshold Int @default(10000)
+  quietHoursStart   Int      @default(22)
+  quietHoursEnd     Int      @default(8)
+  retryDelayHours   Int      @default(24)
+  allowedRecoveryActions String @default("[\"RETRY_LATER\",\"SEND_PAYMENT_UPDATE_LINK\"]")
+  neverRetryFailureReasons String @default("[\"CANCELLED_SUBSCRIPTION\",\"REFUND\",\"SUSPECTED_CHARGEBACK\",\"CHARGEBACK\"]")
   updatedAt         DateTime @updatedAt
+}
+
+model SafetyLabRun {
+  id              String   @id @default(cuid())
+  scenario        String
+  injected        String
+  expectedInvariant String
+  timeline        String
+  requestsReceived Int
+  accepted        Int
+  duplicatesRejected Int
+  providerActions Int
+  finalState      String
+  auditEvents     Int
+  passed          Boolean
+  createdAt       DateTime @default(now())
+}
+
+model SafetyLabClaim {
+  id        String   @id
+  runId     String
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+}
+
+model SafeDemoBatch {
+  id                       String              @id
+  requestId                String              @unique
+  status                   String              @default("RUNNING")
+  casesEvaluated           Int                 @default(0)
+  actionsExecuted          Int                 @default(0)
+  confirmedRecoveryCount   Int                 @default(0)
+  confirmedRecoveryAmount  Int                 @default(0)
+  declinedOrUnresolved     Int                 @default(0)
+  blockedByPolicy          Int                 @default(0)
+  unsafeActionsPrevented   Int                 @default(0)
+  requiresApproval         Int                 @default(0)
+  createdAt                DateTime            @default(now())
+  completedAt              DateTime?
+  items                    SafeDemoBatchCase[]
+}
+
+model SafeDemoBatchCase {
+  id              String        @id @default(cuid())
+  batchId         String
+  recoveryCaseId  String
+  action          String
+  result          String        @default("PENDING")
+  recoveredAmount Int           @default(0)
+  detail          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  batch           SafeDemoBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, recoveryCaseId])
+  @@index([recoveryCaseId])
 }
 
 model RecoveryAnalysis {

@@ -3,7 +3,9 @@ import {scoreRecovery} from '../src/domain/recovery/recovery-scorer';
 const db=new PrismaClient();
 const reasons=['INSUFFICIENT_FUNDS','BANK_TECHNICAL','EXPIRED_CARD','EXPIRED_MANDATE','CUSTOMER_ABANDONMENT','CANCELLED_SUBSCRIPTION','SUSPECTED_CHARGEBACK','UNKNOWN_FAILURE','REFUND'];
 async function main() {
- await db.auditEvent.deleteMany();await db.recoveryExecution.deleteMany();await db.mockProviderOperation.deleteMany();await db.contactEvent.deleteMany();await db.recoveryCase.deleteMany();await db.paymentAttempt.deleteMany();await db.subscription.deleteMany();await db.customer.deleteMany();await db.simulationRun.deleteMany();
+ await db.safeDemoBatchCase.deleteMany();await db.safeDemoBatch.deleteMany();
+ await db.safetyLabClaim.deleteMany();await db.safetyLabRun.deleteMany();
+ await db.providerWebhookEvent.deleteMany();await db.auditEvent.deleteMany();await db.recoveryExecution.deleteMany();await db.mockProviderOperation.deleteMany();await db.contactEvent.deleteMany();await db.recoveryCase.deleteMany();await db.paymentAttempt.deleteMany();await db.subscription.deleteMany();await db.customer.deleteMany();await db.simulationRun.deleteMany();
  const settings=await db.setting.upsert({where:{id:'merchant'},update:{killSwitch:false,autoRecoveryLimit:10000,maxContacts:2},create:{id:'merchant'}});
  const now=new Date();
  for(let i=0;i<300;i++) {

@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Info,
 } from 'lucide-react';
+import {paymentProviderInfo} from '@/integrations/razorpay/provider';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ function getCategoryData(reason: string) {
 export default async function Dashboard() {
   await requireMerchant();
   const d = await dashboardData();
+  const provider=paymentProviderInfo();
 
   const sortedBreakdown = [...d.breakdown].sort((a, b) => b[1] - a[1]);
   const breakdownMax = Math.max(1, ...sortedBreakdown.map(([, v]) => v));
@@ -49,7 +51,7 @@ export default async function Dashboard() {
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="relative z-10">
           <p className="text-[11px] font-bold uppercase tracking-widest text-brand-600 mb-1" style={{animation: 'slideUp 0.3s ease-out both'}}>
-            Current recovery outlook · mock provider
+            Current recovery outlook · {provider.displayName}
           </p>
           <h2 className="text-3xl font-extrabold tracking-tight text-slate-900" style={{animation: 'slideUp 0.3s ease-out 0.05s both'}}>
             Act on the recoverable, protect the rest.
@@ -63,7 +65,7 @@ export default async function Dashboard() {
           <MetricCard
             label="Revenue recovered"
             value={inr(d.recovered)}
-            detail="Confirmed mock payment outcomes"
+            detail={`Confirmed ${provider.activeMode==='mock'?'mock':'test-mode'} payment outcomes`}
             icon={TrendingUp}
             accent
           />
@@ -100,7 +102,7 @@ export default async function Dashboard() {
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0 bg-slate-50/50">
             <div>
               <h3 id="recent-heading" className="section-title">Recent confirmed recoveries</h3>
-              <p className="mt-0.5 text-xs text-slate-500">Latest mock payment confirmations</p>
+              <p className="mt-0.5 text-xs text-slate-500">Latest verified payment confirmations</p>
             </div>
             <CheckCircle size={16} className="text-emerald-500" />
           </div>
@@ -132,15 +134,15 @@ export default async function Dashboard() {
                 <div className="h-12 w-12 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-500 mb-4 shadow-sm">
                   <TrendingUp size={24} />
                 </div>
-                <h4 className="text-sm font-semibold text-slate-900">No mock payments recovered yet</h4>
+                <h4 className="text-sm font-semibold text-slate-900">No confirmed provider recovery yet</h4>
                 <p className="mt-1 text-xs text-slate-500 max-w-sm px-4">
-                  When you run strategies in the simulator or manually execute a recovery action, successful mock payments will appear here.
+                  Confirmed recovery remains ₹0 until a mock confirmation or verified provider webhook succeeds. Synthetic evaluation is kept separate.
                 </p>
                 <Link
                   href="/simulator"
                   className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors focus-visible:outline-brand-500"
                 >
-                  Go to Simulator <ArrowRight size={14} />
+                  View reproducible synthetic batch evidence <ArrowRight size={14} />
                 </Link>
               </div>
             )}

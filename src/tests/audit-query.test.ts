@@ -98,6 +98,16 @@ describe('audit search with SQLite', () => {
     expect(spaced.events.map(e => e.id)).toEqual(['case-space']);
   });
 
+  it('finds batch audit evidence by an ID stored in the payload', async () => {
+    await client.auditEvent.create({data: {id: 'batch-payload', eventType: 'SAFE_DEMO_BATCH_COMPLETED', actor: 'MERCHANT', payload: JSON.stringify({batchId: 'demo_evidence_123'})}});
+    try {
+      const result = await getAuditPage(client, {q: 'demo_evidence_123'});
+      expect(result.events.map(event => event.id)).toEqual(['batch-payload']);
+    } finally {
+      await client.auditEvent.delete({where: {id: 'batch-payload'}});
+    }
+  });
+
   it('keeps filtered totals and page boundaries consistent, with no duplicate rows', async () => {
     const first = await getAuditPage(client, {q: 'Policy reevaluated'});
     const second = await getAuditPage(client, {q: 'Policy reevaluated', page: '2'});
